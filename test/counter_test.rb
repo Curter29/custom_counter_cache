@@ -24,7 +24,7 @@ class CounterTest < Test::Unit::TestCase
     assert_equal 1, @user.published_count
     3.times { |i| @user.articles.create(:state => 'published') }
     assert_equal 4, @user.published_count
-    @user.articles.each {|a| a.update_attributes(:state => 'unpublished') }
+    @user.articles.each {|a| p a.update_attributes(:state => 'unpublished') }
     assert_equal 0, @user.published_count
   end
 

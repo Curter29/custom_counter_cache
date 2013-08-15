@@ -7,19 +7,21 @@ module CustomCounterCache::Model
   module ActsAsMethods
 
     def define_counter_cache(cache_column, &block)
+      return unless table_exists?
+
       # counter accessors
-      unless column_names.include?(cache_column) # Object.const_defined?(:Counter)
+      unless column_names.include?(cache_column.to_s) # Object.const_defined?(:Counter)
         has_many :counters, :as => :countable, :dependent => :destroy
         define_method "#{cache_column}" do
           # Check if the counter is already loaded (e.g. eager-loaded)
           if counters.loaded? && counter = counters.detect{|c| c.key == cache_column.to_s }
             counter.value
           else
-            counters.find(:first, :conditions => { :key => cache_column.to_s }).value rescue 0
+            counters.where(key: cache_column.to_s).first.try(:value).to_i
           end
         end
         define_method "#{cache_column}=" do |count|
-          if ( counter = counters.find(:first, :conditions => { :key => cache_column.to_s }) )
+          if ( counter = counters.where(key: cache_column.to_s).first )
             counter.update_attribute :value, count.to_i
           else
             counters.create :key => cache_column.to_s, :value => count.to_i
@@ -28,11 +30,16 @@ module CustomCounterCache::Model
       end
       # counter update method
       define_method "update_#{cache_column}" do
-        send "#{cache_column}=", block.call(self)
+        count = block.call(self).to_i
+        send "#{cache_column}=", count
+        update_attribute cache_column, count
+        count
       end
     end
 
     def update_counter_cache(association, cache_column, options = {})
+      return unless table_exists?
+
       association  = association.to_sym
       cache_column = cache_column.to_sym
       method_name  = "callback_#{cache_column}".to_sym
